@@ -21,7 +21,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["CAMERA", "RECORD_AUDIO", "INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "package": "com.drhassimac.rabahdjappwrapper"
     },
     "web": {
       "output": "static",
@@ -41,6 +47,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b49a8cee-2396-4d27-9cd5-025a37f7e840"
+      }
+    },
+    "owner": "rabahdfd"
   }
 }
