@@ -35,7 +35,7 @@ export default function Index() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-        onPermissionRequest={(request) => {
+        onPermissionRequest={(request: any) => {
           request.grant(request.resources);
         }}
         originWhitelist={['*']}
