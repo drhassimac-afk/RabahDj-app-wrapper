@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView, StyleSheet, PermissionsAndroid, Platform, Alert } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RABAHDJ_HTML } from '../htmlContent';
 
@@ -19,25 +19,46 @@ const MIME_EXT: Record<string, string> = {
 async function handleFileDownload(downloadUrl: string) {
   try {
     const match = downloadUrl.match(/^data:([^;]+);base64,(.*)$/s);
+
     if (!match) {
       Alert.alert('تعذر التحميل', 'صيغة الملف غير مدعومة');
       return;
     }
+
     const mime = match[1];
     const base64 = match[2];
-    const ext = MIME_EXT[mime] || (mime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+
+    const ext =
+      MIME_EXT[mime] ||
+      (mime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+
     const filename = `rabahdj_${Date.now()}.${ext}`;
-    const fileUri = FileSystem.cacheDirectory + filename;
-    await FileSystem.writeAsStringAsync(fileUri, base64, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+
+    const file = new File(Paths.cache, filename);
+
+    file.create({ overwrite: true });
+    file.write(base64, { encoding: 'base64' });
+
+    console.log('File saved:', file.uri);
+
     if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'حفظ أو فتح الملف' });
+      await Sharing.shareAsync(file.uri, {
+        mimeType: mime,
+        dialogTitle: 'حفظ أو فتح الملف',
+      });
     } else {
-      Alert.alert('تم الحفظ', 'الملف محفوظ في: ' + fileUri);
+      Alert.alert(
+        'تم الحفظ',
+        'تم حفظ الملف مؤقتًا في:\n' + file.uri
+      );
     }
   } catch (e: any) {
-    Alert.alert('خطأ بالتحميل', String(e?.message || e));
+    console.error('Download error:', e);
+
+    Alert.alert(
+      'خطأ بالتحميل',
+      String(e?.message || e)
+    );
   }
 }
 
@@ -73,7 +94,7 @@ export default function Index() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-        onPermissionRequest={(request) => {
+        onPermissionRequest={(request: any) => {
           request.grant(request.resources);
         }}
         onFileDownload={({ nativeEvent }) => {
