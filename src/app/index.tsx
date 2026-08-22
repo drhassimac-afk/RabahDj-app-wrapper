@@ -1,19 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import { WebView } from 'react-native-webview';
-import {
-  SafeAreaView,
-  StyleSheet,
-  PermissionsAndroid,
-  Platform,
-  Alert,
-} from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import { SafeAreaView, StyleSheet, PermissionsAndroid, Platform, Alert } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RABAHDJ_HTML } from '../htmlContent';
-import NativeCallScreen from './NativeCallScreen';
+
+const MIME_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'video/mp4': 'mp4',
+  'audio/mpeg': 'mp3',
+};
+
+async function handleFileDownload(downloadUrl: string) {
+  try {
+    const match = downloadUrl.match(/^data:([^;]+);base64,(.*)$/s);
+    if (!match) {
+      Alert.alert('تعذر التحميل', 'صيغة الملف غير مدعومة');
+      return;
+    }
+    const mime = match[1];
+    const base64 = match[2];
+    const ext = MIME_EXT[mime] || (mime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
+    const filename = `rabahdj_${Date.now()}.${ext}`;
+    const fileUri = FileSystem.cacheDirectory + filename;
+    await FileSystem.writeAsStringAsync(fileUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'حفظ أو فتح الملف' });
+    } else {
+      Alert.alert('تم الحفظ', 'الملف محفوظ في: ' + fileUri);
+    }
+  } catch (e: any) {
+    Alert.alert('خطأ بالتحميل', String(e?.message || e));
+  }
+}
 
 export default function Index() {
-  const [nativeCall, setNativeCall] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,82 +56,29 @@ export default function Index() {
           console.log('permission error', e);
         }
       }
-
       setReady(true);
     }
-
     requestPerms();
   }, []);
 
-  if (!ready) {
-    return <SafeAreaView style={styles.container} />;
-  }
-
-  if (nativeCall) return <NativeCallScreen onBack={() => setNativeCall(false)} />;
+  if (!ready) return <SafeAreaView style={styles.container} />;
 
   return (
     <SafeAreaView style={styles.container}>
-      <WebView onMessage={(e)=>{try{const msg=JSON.parse(e.nativeEvent.data||'{}');if(msg.type==='startNativeStream')setNativeCall(true);}catch{}}} 
-        source={{
-          html: RABAHDJ_HTML,
-          baseUrl: 'https://appassets.androidplatform.net',
-        }}
+      <WebView
+        source={{ html: RABAHDJ_HTML, baseUrl: 'https://appassets.androidplatform.net' }}
         style={styles.webview}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-
-        onPermissionRequest={(request: any) => {
+        onPermissionRequest={(request) => {
           request.grant(request.resources);
         }}
-
-        onFileDownload={async ({ nativeEvent }) => {
-          const { downloadUrl } = nativeEvent;
-
-          try {
-            if (!downloadUrl) {
-              Alert.alert('خطأ', 'تعذر الحصول على رابط الملف');
-              return;
-            }
-
-            console.log('Download requested:', downloadUrl);
-
-            const fileName =
-              decodeURIComponent(downloadUrl.split('/').pop()?.split('?')[0] || 'download');
-
-            const file = new File(Paths.cache, fileName);
-
-            const downloadedFile = await File.downloadFileAsync(
-              downloadUrl,
-              file
-            );
-
-            console.log('File downloaded:', downloadedFile.uri);
-
-            const canShare = await Sharing.isAvailableAsync();
-
-            if (canShare) {
-              await Sharing.shareAsync(downloadedFile.uri, {
-                dialogTitle: 'حفظ أو مشاركة الملف',
-              });
-            } else {
-              Alert.alert(
-                'تم تحميل الملف',
-                `تم حفظ الملف مؤقتًا باسم:\n${fileName}`
-              );
-            }
-          } catch (error) {
-            console.error('Download error:', error);
-
-            Alert.alert(
-              'فشل التحميل',
-              'تعذر تحميل الملف. حاول مرة أخرى.'
-            );
-          }
+        onFileDownload={({ nativeEvent }) => {
+          handleFileDownload(nativeEvent.downloadUrl);
         }}
-
         originWhitelist={['*']}
       />
     </SafeAreaView>
@@ -111,12 +86,6 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0b1220',
-  },
-
-  webview: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#0b1220' },
+  webview: { flex: 1 },
 });
