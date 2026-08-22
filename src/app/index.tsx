@@ -10,8 +10,10 @@ import {
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RABAHDJ_HTML } from '../htmlContent';
+import NativeCallScreen from './NativeCallScreen';
 
 export default function Index() {
+  const [nativeCall, setNativeCall] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,9 +39,11 @@ export default function Index() {
     return <SafeAreaView style={styles.container} />;
   }
 
+  if (nativeCall) return <NativeCallScreen onBack={() => setNativeCall(false)} />;
+
   return (
     <SafeAreaView style={styles.container}>
-      <WebView
+      <WebView onMessage={(e)=>{try{const msg=JSON.parse(e.nativeEvent.data||'{}');if(msg.type==='startNativeStream')setNativeCall(true);}catch{}}} 
         source={{
           html: RABAHDJ_HTML,
           baseUrl: 'https://appassets.androidplatform.net',

@@ -42,7 +42,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -51,9 +52,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b49a8cee-2396-4d27-9cd5-025a37f7e840"
+        "projectId": "95c87299-0acd-48ce-b9af-50342e996554"
       }
     },
-    "owner": "rabahdfd"
+    "owner": "badida"
   }
 }
