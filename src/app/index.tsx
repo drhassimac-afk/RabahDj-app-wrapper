@@ -51,6 +51,9 @@ export default function Index() {
   const [ready, setReady] = useState(false);
   const webviewRef = useRef<WebView>(null);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const pttStartingRef = useRef(false);
+  const pttRecordingRef = useRef(false);
+  const pttStopRequestedRef = useRef(false);
 
   useEffect(() => {
     async function requestPerms() {
@@ -70,18 +73,34 @@ export default function Index() {
   }, []);
 
   async function startNativePtt() {
+    if (pttStartingRef.current || pttRecordingRef.current) return; // منع بدء تسجيل ثانٍ
+    pttStartingRef.current = true;
+    pttStopRequestedRef.current = false;
     try {
       const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
-        webviewRef.current?.injectJavaScript(
-          `window.onNativePttError && window.onNativePttError('صلاحية المايك مرفوضة'); true;`
-        );
-        return;
+        throw new Error('صلاحية المايك مرفوضة');
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await audioRecorder.prepareToRecordAsync();
+
+      if (pttStopRequestedRef.current) {
+        // المستخدم رفع إصبعه أثناء التحضير — لا تبدأ تسجيل جديد
+        pttStartingRef.current = false;
+        pttStopRequestedRef.current = false;
+        return;
+      }
+
       audioRecorder.record();
+      pttRecordingRef.current = true;
+      pttStartingRef.current = false;
+
+      if (pttStopRequestedRef.current) {
+        await stopNativePtt();
+      }
     } catch (e: any) {
+      pttStartingRef.current = false;
+      pttRecordingRef.current = false;
       webviewRef.current?.injectJavaScript(
         `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
       );
@@ -89,6 +108,13 @@ export default function Index() {
   }
 
   async function stopNativePtt() {
+    if (pttStartingRef.current) {
+      // التسجيل لسا بيتحضّر — نأجل الإيقاف لحد ما يبدأ فعليًا
+      pttStopRequestedRef.current = true;
+      return;
+    }
+    if (!pttRecordingRef.current) return; // ما فيش تسجيل شغال أصلاً
+    pttRecordingRef.current = false;
     try {
       await audioRecorder.stop();
       const uri = audioRecorder.uri;
@@ -103,6 +129,8 @@ export default function Index() {
       webviewRef.current?.injectJavaScript(
         `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
       );
+    } finally {
+      pttStopRequestedRef.current = false;
     }
   }
 
@@ -119,7 +147,9 @@ export default function Index() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-        onPermissionRequest={(request) => {
+        // @ts-ignore — onPermissionRequest n'est pas dans les types officiels de cette version
+        // de react-native-webview, mais reste nécessaire au runtime pour la permission caméra/micro
+        onPermissionRequest={(request: any) => {
           request.grant(request.resources);
         }}
         onFileDownload={({ nativeEvent }) => {
