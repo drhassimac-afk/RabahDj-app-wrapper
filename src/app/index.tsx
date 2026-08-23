@@ -6,7 +6,7 @@ import * as Sharing from 'expo-sharing';
 import {
   useAudioRecorder,
   RecordingPresets,
-  requestRecordingPermissionsAsync,
+  AudioModule,
   setAudioModeAsync,
 } from 'expo-audio';
 import { RABAHDJ_HTML } from '../htmlContent';
@@ -71,7 +71,7 @@ export default function Index() {
 
   async function startNativePtt() {
     try {
-      const perm = await requestRecordingPermissionsAsync();
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
         webviewRef.current?.injectJavaScript(
           `window.onNativePttError && window.onNativePttError('صلاحية المايك مرفوضة'); true;`
