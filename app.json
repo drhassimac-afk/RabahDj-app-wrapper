@@ -25,7 +25,11 @@
         "CAMERA",
         "RECORD_AUDIO",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "package": "com.drhassimac.rabahdjappwrapper"
     },
@@ -43,7 +47,9 @@
           "imageWidth": 76
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -52,9 +58,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "95c87299-0acd-48ce-b9af-50342e996554"
+        "projectId": "e6a97b6e-607f-4633-8c6b-6ca267e73852"
       }
     },
-    "owner": "badida"
+    "owner": "rabahdj"
   }
 }
