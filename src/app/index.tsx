@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView, StyleSheet, PermissionsAndroid, Platform, Alert } from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import {
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { RABAHDJ_HTML } from '../htmlContent';
 
 const MIME_EXT: Record<string, string> = {
@@ -19,51 +25,32 @@ const MIME_EXT: Record<string, string> = {
 async function handleFileDownload(downloadUrl: string) {
   try {
     const match = downloadUrl.match(/^data:([^;]+);base64,(.*)$/s);
-
     if (!match) {
       Alert.alert('تعذر التحميل', 'صيغة الملف غير مدعومة');
       return;
     }
-
     const mime = match[1];
     const base64 = match[2];
-
-    const ext =
-      MIME_EXT[mime] ||
-      (mime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
-
+    const ext = MIME_EXT[mime] || (mime.split('/')[1] || 'bin').replace(/[^a-zA-Z0-9]/g, '');
     const filename = `rabahdj_${Date.now()}.${ext}`;
-
-    const file = new File(Paths.cache, filename);
-
-    file.create({ overwrite: true });
-    file.write(base64, { encoding: 'base64' });
-
-    console.log('File saved:', file.uri);
-
+    const fileUri = FileSystem.cacheDirectory + filename;
+    await FileSystem.writeAsStringAsync(fileUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
     if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(file.uri, {
-        mimeType: mime,
-        dialogTitle: 'حفظ أو فتح الملف',
-      });
+      await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'حفظ أو فتح الملف' });
     } else {
-      Alert.alert(
-        'تم الحفظ',
-        'تم حفظ الملف مؤقتًا في:\n' + file.uri
-      );
+      Alert.alert('تم الحفظ', 'الملف محفوظ في: ' + fileUri);
     }
   } catch (e: any) {
-    console.error('Download error:', e);
-
-    Alert.alert(
-      'خطأ بالتحميل',
-      String(e?.message || e)
-    );
+    Alert.alert('خطأ بالتحميل', String(e?.message || e));
   }
 }
 
 export default function Index() {
   const [ready, setReady] = useState(false);
+  const webviewRef = useRef<WebView>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   useEffect(() => {
     async function requestPerms() {
@@ -82,11 +69,49 @@ export default function Index() {
     requestPerms();
   }, []);
 
+  async function startNativePtt() {
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        webviewRef.current?.injectJavaScript(
+          `window.onNativePttError && window.onNativePttError('صلاحية المايك مرفوضة'); true;`
+        );
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+    } catch (e: any) {
+      webviewRef.current?.injectJavaScript(
+        `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
+      );
+    }
+  }
+
+  async function stopNativePtt() {
+    try {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      if (!uri) return;
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      webviewRef.current?.injectJavaScript(
+        `window.onNativePttRecorded && window.onNativePttRecorded(${JSON.stringify(base64)}); true;`
+      );
+    } catch (e: any) {
+      webviewRef.current?.injectJavaScript(
+        `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
+      );
+    }
+  }
+
   if (!ready) return <SafeAreaView style={styles.container} />;
 
   return (
     <SafeAreaView style={styles.container}>
       <WebView
+        ref={webviewRef}
         source={{ html: RABAHDJ_HTML, baseUrl: 'https://appassets.androidplatform.net' }}
         style={styles.webview}
         javaScriptEnabled
@@ -94,11 +119,20 @@ export default function Index() {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         mixedContentMode="always"
-        onPermissionRequest={(request: any) => {
+        onPermissionRequest={(request) => {
           request.grant(request.resources);
         }}
         onFileDownload={({ nativeEvent }) => {
           handleFileDownload(nativeEvent.downloadUrl);
+        }}
+        onMessage={({ nativeEvent }) => {
+          try {
+            const msg = JSON.parse(nativeEvent.data);
+            if (msg.cmd === 'pttStart') startNativePtt();
+            if (msg.cmd === 'pttStop') stopNativePtt();
+          } catch (e) {
+            console.log('onMessage parse error', e);
+          }
         }}
         originWhitelist={['*']}
       />
