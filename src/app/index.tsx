@@ -1,14 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { WebView } from 'react-native-webview';
-import { SafeAreaView, StyleSheet, PermissionsAndroid, Platform, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import {
-  useAudioRecorder,
-  RecordingPresets,
-  AudioModule,
-  setAudioModeAsync,
-} from 'expo-audio';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet } from 'react-native';
+
+import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
+import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
 
 const MIME_EXT: Record<string, string> = {
@@ -42,18 +38,60 @@ async function handleFileDownload(downloadUrl: string) {
     } else {
       Alert.alert('تم الحفظ', 'الملف محفوظ في: ' + fileUri);
     }
-  } catch (e: any) {
-    Alert.alert('خطأ بالتحميل', String(e?.message || e));
+  } catch (error: unknown) {
+    Alert.alert('خطأ بالتحميل', error instanceof Error ? error.message : String(error));
   }
+}
+
+/** قراءة الملف الصوتي الناتج وتحويله إلى base64 على كل المنصّات. */
+async function readAudioAsBase64(uri: string): Promise<string> {
+  if (Platform.OS === 'web') {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('تعذر قراءة الملف الصوتي'));
+      reader.onload = () => {
+        const result = String(reader.result ?? '');
+        resolve(result.slice(result.indexOf(',') + 1));
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+  return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
 }
 
 export default function Index() {
   const [ready, setReady] = useState(false);
-  const webviewRef = useRef<WebView>(null);
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const pttStartingRef = useRef(false);
-  const pttRecordingRef = useRef(false);
-  const pttStopRequestedRef = useRef(false);
+  const hostRef = useRef<HtmlHostHandle>(null);
+
+  const injectToPage = useCallback((code: string) => {
+    hostRef.current?.injectJavaScript(code);
+  }, []);
+
+  const handleRecorded = useCallback(
+    async (uri: string) => {
+      const base64 = await readAudioAsBase64(uri);
+      injectToPage(
+        `window.onNativePttRecorded && window.onNativePttRecorded(${JSON.stringify(base64)});`
+      );
+    },
+    [injectToPage]
+  );
+
+  const handleRecorderError = useCallback(
+    (message: string) => {
+      injectToPage(
+        `window.onNativePttError && window.onNativePttError(${JSON.stringify(message)});`
+      );
+    },
+    [injectToPage]
+  );
+
+  const { start: startPtt, stop: stopPtt } = usePttRecorder({
+    onRecorded: handleRecorded,
+    onError: handleRecorderError,
+  });
 
   useEffect(() => {
     async function requestPerms() {
@@ -63,8 +101,8 @@ export default function Index() {
             PermissionsAndroid.PERMISSIONS.CAMERA,
             PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           ]);
-        } catch (e) {
-          console.log('permission error', e);
+        } catch (error) {
+          console.log('permission error', error);
         }
       }
       setReady(true);
@@ -72,99 +110,28 @@ export default function Index() {
     requestPerms();
   }, []);
 
-  async function startNativePtt() {
-    if (pttStartingRef.current || pttRecordingRef.current) return; // منع بدء تسجيل ثانٍ
-    pttStartingRef.current = true;
-    pttStopRequestedRef.current = false;
-    try {
-      const perm = await AudioModule.requestRecordingPermissionsAsync();
-      if (!perm.granted) {
-        throw new Error('صلاحية المايك مرفوضة');
+  const handleMessage = useCallback(
+    (data: string) => {
+      try {
+        const msg = JSON.parse(data) as { cmd?: string };
+        if (msg.cmd === 'pttStart') void startPtt();
+        if (msg.cmd === 'pttStop') void stopPtt();
+      } catch (error) {
+        console.log('onMessage parse error', error);
       }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await audioRecorder.prepareToRecordAsync();
-
-      if (pttStopRequestedRef.current) {
-        // المستخدم رفع إصبعه أثناء التحضير — لا تبدأ تسجيل جديد
-        pttStartingRef.current = false;
-        pttStopRequestedRef.current = false;
-        return;
-      }
-
-      audioRecorder.record();
-      pttRecordingRef.current = true;
-      pttStartingRef.current = false;
-
-      if (pttStopRequestedRef.current) {
-        await stopNativePtt();
-      }
-    } catch (e: any) {
-      pttStartingRef.current = false;
-      pttRecordingRef.current = false;
-      webviewRef.current?.injectJavaScript(
-        `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
-      );
-    }
-  }
-
-  async function stopNativePtt() {
-    if (pttStartingRef.current) {
-      // التسجيل لسا بيتحضّر — نأجل الإيقاف لحد ما يبدأ فعليًا
-      pttStopRequestedRef.current = true;
-      return;
-    }
-    if (!pttRecordingRef.current) return; // ما فيش تسجيل شغال أصلاً
-    pttRecordingRef.current = false;
-    try {
-      await audioRecorder.stop();
-      const uri = audioRecorder.uri;
-      if (!uri) return;
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      webviewRef.current?.injectJavaScript(
-        `window.onNativePttRecorded && window.onNativePttRecorded(${JSON.stringify(base64)}); true;`
-      );
-    } catch (e: any) {
-      webviewRef.current?.injectJavaScript(
-        `window.onNativePttError && window.onNativePttError(${JSON.stringify(String(e?.message || e))}); true;`
-      );
-    } finally {
-      pttStopRequestedRef.current = false;
-    }
-  }
+    },
+    [startPtt, stopPtt]
+  );
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
   return (
     <SafeAreaView style={styles.container}>
-      <WebView
-        ref={webviewRef}
-        source={{ html: RABAHDJ_HTML, baseUrl: 'https://appassets.androidplatform.net' }}
-        style={styles.webview}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        mixedContentMode="always"
-        // @ts-ignore — onPermissionRequest n'est pas dans les types officiels de cette version
-        // de react-native-webview, mais reste nécessaire au runtime pour la permission caméra/micro
-        onPermissionRequest={(request: any) => {
-          request.grant(request.resources);
-        }}
-        onFileDownload={({ nativeEvent }) => {
-          handleFileDownload(nativeEvent.downloadUrl);
-        }}
-        onMessage={({ nativeEvent }) => {
-          try {
-            const msg = JSON.parse(nativeEvent.data);
-            if (msg.cmd === 'pttStart') startNativePtt();
-            if (msg.cmd === 'pttStop') stopNativePtt();
-          } catch (e) {
-            console.log('onMessage parse error', e);
-          }
-        }}
-        originWhitelist={['*']}
+      <HtmlHost
+        ref={hostRef}
+        html={RABAHDJ_HTML}
+        onMessage={handleMessage}
+        onFileDownload={handleFileDownload}
       />
     </SafeAreaView>
   );
@@ -172,5 +139,4 @@ export default function Index() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
-  webview: { flex: 1 },
 });
