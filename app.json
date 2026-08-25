@@ -47,7 +47,6 @@
         }
       ],
       "expo-router",
-      "expo-sharing",
       "expo-splash-screen"
     ],
     "experiments": {
