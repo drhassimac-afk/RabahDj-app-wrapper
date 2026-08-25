@@ -31,7 +31,8 @@
         "WAKE_LOCK",
         "VIBRATE",
         "RECEIVE_BOOT_COMPLETED"
-      ]
+      ],
+      "package": "com.rabahdj.app"
     },
     "web": {
       "output": "static",
