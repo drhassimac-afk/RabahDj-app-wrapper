@@ -17,7 +17,14 @@ export type HtmlHostProps = {
 /** مستضيف الصفحة على أندرويد باستخدام WebView. */
 const HtmlHost = forwardRef<HtmlHostHandle, HtmlHostProps>(
   ({ html, onMessage, onFileDownload }, ref) => {
-    const webviewRef = useRef<WebView>(null);
+    const webviewRef = useRef<WebView
+      injectedJavaScript={`
+  const mirrorStyle = document.createElement("style");
+  mirrorStyle.innerHTML = "#localVideo, [id*="local"], [id*="myVideo"], [id*="mini"] { transform: scaleX(-1) !important; -webkit-transform: scaleX(-1) !important; }";
+  document.head.appendChild(mirrorStyle);
+  true;
+`}
+      javaScriptEnabled={true}>(null);
 
     useImperativeHandle(ref, () => ({
       injectJavaScript: (code: string) => {
