@@ -45,7 +45,10 @@
           "icon": "./assets/images/icon.png",
           "color": "#0b1220"
         }
-      ]
+      ],
+      "expo-router",
+      "expo-sharing",
+      "expo-splash-screen"
     ],
     "experiments": {
       "typedRoutes": true,
