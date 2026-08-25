@@ -30,7 +30,10 @@
         "CHANGE_WIFI_MULTICAST_STATE",
         "BLUETOOTH_CONNECT",
         "BLUETOOTH_SCAN",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "WAKE_LOCK",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
       ],
       "package": "com.drhassimac.rabahdjappwrapper"
     },
@@ -50,7 +53,14 @@
       ],
       "expo-sharing",
       "expo-audio",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#0b1220"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
