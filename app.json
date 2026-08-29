@@ -39,7 +39,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-        "react-native-webrtc",
       [ 
         "expo-notifications",
         {
