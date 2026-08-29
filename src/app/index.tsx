@@ -1,11 +1,21 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet } from 'react-native';
 
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const MIME_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -60,6 +70,51 @@ async function readAudioAsBase64(uri: string): Promise<string> {
   }
   return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
 }
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+async function setupNotifications() {
+  try {
+    if (Platform.OS !== 'android') return;
+
+    await Notifications.setNotificationChannelAsync('rabahdj', {
+      name: 'RabahDj',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: 'default',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+
+    const permissions = await Notifications.getPermissionsAsync();
+
+    if (permissions.status !== 'granted') {
+      await Notifications.requestPermissionsAsync();
+    }
+  } catch (error) {
+    console.log('notification setup error', error);
+  }
+}
+
+async function showRabahNotification(title: string, body: string) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    console.log('notification error', error);
+  }
+}
 
 export default function Index() {
   const [ready, setReady] = useState(false);
@@ -94,34 +149,81 @@ export default function Index() {
   });
 
   useEffect(() => {
-    async function requestPerms() {
-      if (Platform.OS === 'android') {
-        try {
-          await PermissionsAndroid.requestMultiple([
-            PermissionsAndroid.PERMISSIONS.CAMERA,
-            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          ]);
-        } catch (error) {
-          console.log('permission error', error);
+  async function requestPerms() {
+    if (Platform.OS === 'android') {
+      try {
+        await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+
+        // إذن الإشعارات
+        const { status } = await Notifications.requestPermissionsAsync();
+
+        if (status !== 'granted') {
+          console.log('Notification permission not granted');
         }
+
+        // قناة إشعارات Android
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'RabahDj',
+          importance: Notifications.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+        });
+      } catch (error) {
+        console.log('permission error', error);
       }
-      setReady(true);
     }
-    requestPerms();
-  }, []);
+
+    setReady(true);
+  }
+
+  requestPerms();
+}, []);
+
+  const showNativeNotification = useCallback(
+    (title: string, body: string) => {
+      void Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: 'default',
+        },
+        trigger: null,
+      });
+    },
+    []
+  );
 
   const handleMessage = useCallback(
-    (data: string) => {
-      try {
-        const msg = JSON.parse(data) as { cmd?: string };
-        if (msg.cmd === 'pttStart') void startPtt();
-        if (msg.cmd === 'pttStop') void stopPtt();
-      } catch (error) {
-        console.log('onMessage parse error', error);
+  (data: string) => {
+    try {
+      const msg = JSON.parse(data) as {
+        cmd?: string;
+        title?: string;
+        body?: string;
+      };
+
+      if (msg.cmd === 'pttStart') void startPtt();
+      if (msg.cmd === 'pttStop') void stopPtt();
+
+      if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
+        void Notifications.scheduleNotificationAsync({
+          content: {
+            title: msg.title,
+            body: msg.body,
+            sound: 'default',
+          },
+          trigger: null,
+        });
       }
-    },
-    [startPtt, stopPtt]
-  );
+    } catch (error) {
+      console.log('onMessage parse error', error);
+    }
+  },
+  [startPtt, stopPtt]
+);
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 

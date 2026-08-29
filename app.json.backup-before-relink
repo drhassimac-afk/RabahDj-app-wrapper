@@ -39,9 +39,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-  "react-native-webrtc"
-]
-    "plugins": [
       [
         "expo-notifications",
         {
@@ -65,9 +62,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b49a8cee-2396-4d27-9cd5-025a37f7e840"
+        "projectId": "e6a97b6e-607f-4633-8c6b-6ca267e73852"
       }
     },
-    "owner": "rabahdfd"
+    "owner": "rabahdj"
   }
 }
