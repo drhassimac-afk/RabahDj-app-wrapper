@@ -7,7 +7,7 @@ import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, To
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
-
+import TestWebRTC from './test-webrtc';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -119,7 +119,9 @@ async function showRabahNotification(title: string, body: string) {
 
 export default function Index() {
   const [ready, setReady] = useState(false);
-  const [showTest, setShowTest] = useState(false);
+  const [
+
+showTest, setShowTest] = useState(false);
   const hostRef = useRef<HtmlHostHandle>(null);
 
   const injectToPage = useCallback((code: string) => {
@@ -232,7 +234,7 @@ export default function Index() {
   return (
   <SafeAreaView style={styles.container}>
     {showTest ? (
-      <Text style={{color:'#fff', marginTop:100}}>اختبار مؤقت</Text>
+      <TestWebRTC />
     ) : (
       <HtmlHost
         ref={hostRef}
