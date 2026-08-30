@@ -1,6 +1,7 @@
 import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
@@ -9,6 +10,7 @@ import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
 import WalkieNative from '@/components/walkie-native';
 import LiveNative from '@/components/live-native';
+import FilesNative, { type NativeFileEntry } from '@/components/files-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -109,6 +111,8 @@ async function showRabahNotification(title: string, body: string) {
   }
 }
 
+const MAX_FILE_BYTES = 8 * 1024 * 1024;
+
 export default function Index() {
   const [ready, setReady] = useState(false);
   const [showWalkie, setShowWalkie] = useState(false);
@@ -118,6 +122,9 @@ export default function Index() {
   const [showLive, setShowLive] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
+
+  const [showFiles, setShowFiles] = useState(false);
+  const [nativeFiles, setNativeFiles] = useState<NativeFileEntry[]>([]);
 
   const hostRef = useRef<HtmlHostHandle>(null);
 
@@ -183,6 +190,37 @@ export default function Index() {
     injectToPage(`switchCamera(); void 0;`);
   }, [injectToPage]);
 
+  const handlePickFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+
+      for (const asset of result.assets) {
+        if (asset.size && asset.size > MAX_FILE_BYTES) {
+          Alert.alert('ملف كبير جدًا', `تم تجاهل ${asset.name} (أكبر من 8MB)`);
+          continue;
+        }
+        const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const mime = asset.mimeType || 'application/octet-stream';
+        const dataUrl = `data:${mime};base64,${base64}`;
+        injectToPage(
+          `window.onNativeFilePicked && window.onNativeFilePicked(${JSON.stringify(asset.name)}, ${asset.size ?? 0}, ${JSON.stringify(dataUrl)});`
+        );
+      }
+    } catch (error) {
+      Alert.alert('خطأ', error instanceof Error ? error.message : String(error));
+    }
+  }, [injectToPage]);
+
+  const handleDownloadFile = useCallback((file: NativeFileEntry) => {
+    void handleFileDownload(file.dataUrl);
+  }, []);
+
   useEffect(() => {
     async function requestPerms() {
       if (Platform.OS === 'android') {
@@ -239,6 +277,9 @@ export default function Index() {
           mine?: boolean;
           active?: boolean;
           muted?: boolean;
+          size?: number;
+          dataUrl?: string;
+          from?: string;
         };
 
         if (msg.cmd === 'pttStart') void startPtt();
@@ -254,6 +295,18 @@ export default function Index() {
 
         if (msg.cmd === 'micStatus' && typeof msg.muted === 'boolean') {
           setIsMicMuted(msg.muted);
+        }
+
+        if (msg.cmd === 'fileReceived' && msg.name && msg.dataUrl) {
+          const entry: NativeFileEntry = {
+            id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            name: msg.name,
+            size: msg.size ?? 0,
+            dataUrl: msg.dataUrl,
+            from: msg.from ?? '?',
+            mine: !!msg.mine,
+          };
+          setNativeFiles((prev) => [entry, ...prev]);
         }
 
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
@@ -275,7 +328,7 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
-  const isOverlayActive = showWalkie || showLive;
+  const isOverlayActive = showWalkie || showLive || showFiles;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -284,7 +337,7 @@ export default function Index() {
         html={RABAHDJ_HTML}
         onMessage={handleMessage}
         onFileDownload={handleFileDownload}
-        style={showWalkie ? styles.hidden : styles.flexFull}
+        style={showWalkie || showFiles ? styles.hidden : styles.flexFull}
       />
       {showWalkie && (
         <WalkieNative
@@ -305,6 +358,14 @@ export default function Index() {
           onBack={closeLive}
         />
       )}
+      {showFiles && (
+        <FilesNative
+          files={nativeFiles}
+          onPickFile={handlePickFile}
+          onDownload={handleDownloadFile}
+          onBack={() => setShowFiles(false)}
+        />
+      )}
       {!isOverlayActive && (
         <>
           <TouchableOpacity
@@ -318,6 +379,12 @@ export default function Index() {
             onPress={openLive}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>📡 بث مباشر</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 150, right: 10, backgroundColor: '#7c1fd9', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={() => setShowFiles(true)}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📁 ملفات</Text>
           </TouchableOpacity>
         </>
       )}
