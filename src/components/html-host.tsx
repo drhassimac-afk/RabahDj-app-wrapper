@@ -30,7 +30,7 @@ const HtmlHost = forwardRef<HtmlHostHandle, HtmlHostProps>(
           html,
           baseUrl: 'https://appassets.androidplatform.net',
         }}
-        style={styles.webview, style]}
+        style={[styles.webview, style]}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
