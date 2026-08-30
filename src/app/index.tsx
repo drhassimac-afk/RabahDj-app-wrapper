@@ -12,6 +12,7 @@ import WalkieNative from '@/components/walkie-native';
 import LiveNative from '@/components/live-native';
 import FilesNative, { type NativeFileEntry } from '@/components/files-native';
 import CinemaNative from '@/components/cinema-native';
+import GamesNative, { type XoState, type ChessState } from '@/components/games-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -58,7 +59,6 @@ async function handleFileDownload(downloadUrl: string) {
   }
 }
 
-/** قراءة الملف الصوتي الناتج وتحويله إلى base64 على كل المنصّات. */
 async function readAudioAsBase64(uri: string): Promise<string> {
   if (Platform.OS === 'web') {
     const response = await fetch(uri);
@@ -115,6 +115,7 @@ async function showRabahNotification(title: string, body: string) {
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
 type CinemaCategory = 'movies' | 'tv' | 'series';
+type GameTab = 'xo' | 'chess';
 
 export default function Index() {
   const [ready, setReady] = useState(false);
@@ -132,6 +133,11 @@ export default function Index() {
   const [showCinema, setShowCinema] = useState(false);
   const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('movies');
   const [cinemaHistory, setCinemaHistory] = useState<string[]>([]);
+
+  const [showGames, setShowGames] = useState(false);
+  const [activeGameTab, setActiveGameTab] = useState<GameTab>('xo');
+  const [xoState, setXoState] = useState<XoState | null>(null);
+  const [chessState, setChessState] = useState<ChessState | null>(null);
 
   const hostRef = useRef<HtmlHostHandle>(null);
 
@@ -252,6 +258,45 @@ export default function Index() {
     [injectToPage]
   );
 
+  const openGames = useCallback(() => {
+    setShowGames(true);
+    injectToPage(`go('games'); showGame('xo'); void 0;`);
+  }, [injectToPage]);
+
+  const closeGames = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowGames(false);
+  }, [injectToPage]);
+
+  const handleSelectGameTab = useCallback(
+    (tab: GameTab) => {
+      injectToPage(`showGame(${JSON.stringify(tab)}); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleXoCell = useCallback(
+    (index: number) => {
+      injectToPage(`clickXO(${index}); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleChessCell = useCallback(
+    (row: number, col: number) => {
+      injectToPage(`clickChessSq(${row}, ${col}); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleResetXo = useCallback(() => {
+    injectToPage(`resetXO(); void 0;`);
+  }, [injectToPage]);
+
+  const handleResetChess = useCallback(() => {
+    injectToPage(`resetChess(); void 0;`);
+  }, [injectToPage]);
+
   useEffect(() => {
     async function requestPerms() {
       if (Platform.OS === 'android') {
@@ -313,6 +358,16 @@ export default function Index() {
           from?: string;
           category?: CinemaCategory;
           history?: string[];
+          board?: unknown;
+          turn?: string | null;
+          score?: { X: number; O: number };
+          winLine?: number[] | null;
+          mySymbol?: string;
+          selected?: [number, number] | null;
+          captured?: { w: string[]; b: string[] };
+          myColor?: string;
+          validMoves?: [number, number][];
+          which?: GameTab;
         };
 
         if (msg.cmd === 'pttStart') void startPtt();
@@ -347,6 +402,31 @@ export default function Index() {
           setCinemaHistory(msg.history ?? []);
         }
 
+        if (msg.cmd === 'xoState' && msg.board && msg.score && msg.mySymbol) {
+          setXoState({
+            board: msg.board as string[],
+            turn: msg.turn ?? null,
+            score: msg.score,
+            winLine: msg.winLine ?? null,
+            mySymbol: msg.mySymbol,
+          });
+        }
+
+        if (msg.cmd === 'chessState' && msg.board && msg.turn && msg.myColor && msg.captured) {
+          setChessState({
+            board: msg.board as string[][],
+            turn: msg.turn,
+            selected: msg.selected ?? null,
+            captured: msg.captured,
+            myColor: msg.myColor,
+            validMoves: msg.validMoves ?? [],
+          });
+        }
+
+        if (msg.cmd === 'gameTab' && msg.which) {
+          setActiveGameTab(msg.which);
+        }
+
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
           void Notifications.scheduleNotificationAsync({
             content: {
@@ -366,8 +446,8 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
-  const isFullOverlayActive = showWalkie || showFiles;
-  const isAnyOverlayActive = showWalkie || showLive || showFiles || showCinema;
+  const isFullOverlayActive = showWalkie || showFiles || showGames;
+  const isAnyOverlayActive = showWalkie || showLive || showFiles || showCinema || showGames;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -414,6 +494,19 @@ export default function Index() {
           onBack={closeCinema}
         />
       )}
+      {showGames && (
+        <GamesNative
+          activeTab={activeGameTab}
+          xo={xoState}
+          chess={chessState}
+          onSelectTab={handleSelectGameTab}
+          onXoCell={handleXoCell}
+          onChessCell={handleChessCell}
+          onResetXo={handleResetXo}
+          onResetChess={handleResetChess}
+          onBack={closeGames}
+        />
+      )}
       {!isAnyOverlayActive && (
         <>
           <TouchableOpacity
@@ -439,6 +532,12 @@ export default function Index() {
             onPress={openCinema}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎬 سينما</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 260, right: 10, backgroundColor: '#f59e0b', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openGames}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎮 ألعاب</Text>
           </TouchableOpacity>
         </>
       )}
