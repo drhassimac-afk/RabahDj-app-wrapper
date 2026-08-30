@@ -7,7 +7,7 @@ import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, To
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
-import TestWebRTC from './test-webrtc';
+import WalkieNative from '@/components/walkie-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -71,14 +71,6 @@ async function readAudioAsBase64(uri: string): Promise<string> {
   }
   return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
 }
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
 
 async function setupNotifications() {
   try {
@@ -93,7 +85,6 @@ async function setupNotifications() {
     });
 
     const permissions = await Notifications.getPermissionsAsync();
-
     if (permissions.status !== 'granted') {
       await Notifications.requestPermissionsAsync();
     }
@@ -119,9 +110,9 @@ async function showRabahNotification(title: string, body: string) {
 
 export default function Index() {
   const [ready, setReady] = useState(false);
-  const [
-
-showTest, setShowTest] = useState(false);
+  const [showWalkie, setShowWalkie] = useState(false);
+  const [isPttRecording, setIsPttRecording] = useState(false);
+  const [lastSpeaker, setLastSpeaker] = useState<string | null>(null);
   const hostRef = useRef<HtmlHostHandle>(null);
 
   const injectToPage = useCallback((code: string) => {
@@ -152,39 +143,46 @@ showTest, setShowTest] = useState(false);
     onError: handleRecorderError,
   });
 
+  const handleWalkiePressIn = useCallback(() => {
+    setIsPttRecording(true);
+    void startPtt();
+  }, [startPtt]);
+
+  const handleWalkiePressOut = useCallback(() => {
+    setIsPttRecording(false);
+    void stopPtt();
+  }, [stopPtt]);
+
   useEffect(() => {
-  async function requestPerms() {
-    if (Platform.OS === 'android') {
-      try {
-        await PermissionsAndroid.requestMultiple([
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-        ]);
+    async function requestPerms() {
+      if (Platform.OS === 'android') {
+        try {
+          await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          ]);
 
-        // إذن الإشعارات
-        const { status } = await Notifications.requestPermissionsAsync();
+          const { status } = await Notifications.requestPermissionsAsync();
+          if (status !== 'granted') {
+            console.log('Notification permission not granted');
+          }
 
-        if (status !== 'granted') {
-          console.log('Notification permission not granted');
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'RabahDj',
+            importance: Notifications.AndroidImportance.HIGH,
+            vibrationPattern: [0, 250, 250, 250],
+            sound: 'default',
+          });
+        } catch (error) {
+          console.log('permission error', error);
         }
-
-        // قناة إشعارات Android
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'RabahDj',
-          importance: Notifications.AndroidImportance.HIGH,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-        });
-      } catch (error) {
-        console.log('permission error', error);
       }
+
+      setReady(true);
     }
 
-    setReady(true);
-  }
-
-  requestPerms();
-}, []);
+    requestPerms();
+  }, []);
 
   const showNativeNotification = useCallback(
     (title: string, body: string) => {
@@ -201,58 +199,74 @@ showTest, setShowTest] = useState(false);
   );
 
   const handleMessage = useCallback(
-  (data: string) => {
-    try {
-      const msg = JSON.parse(data) as {
-        cmd?: string;
-        title?: string;
-        body?: string;
-      };
+    (data: string) => {
+      try {
+        const msg = JSON.parse(data) as {
+          cmd?: string;
+          title?: string;
+          body?: string;
+          name?: string;
+          mine?: boolean;
+        };
 
-      if (msg.cmd === 'pttStart') void startPtt();
-      if (msg.cmd === 'pttStop') void stopPtt();
+        if (msg.cmd === 'pttStart') void startPtt();
+        if (msg.cmd === 'pttStop') void stopPtt();
 
-      if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
-        void Notifications.scheduleNotificationAsync({
-          content: {
-            title: msg.title,
-            body: msg.body,
-            sound: 'default',
-          },
-          trigger: null,
-        });
+        if (msg.cmd === 'walkieLastSpeaker' && msg.name) {
+          setLastSpeaker(msg.mine ? 'أنت' : msg.name);
+        }
+
+        if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
+          void Notifications.scheduleNotificationAsync({
+            content: {
+              title: msg.title,
+              body: msg.body,
+              sound: 'default',
+            },
+            trigger: null,
+          });
+        }
+      } catch (error) {
+        console.log('onMessage parse error', error);
       }
-    } catch (error) {
-      console.log('onMessage parse error', error);
-    }
-  },
-  [startPtt, stopPtt]
-);
+    },
+    [startPtt, stopPtt]
+  );
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
   return (
-  <SafeAreaView style={styles.container}>
-    {showTest ? (
-      <TestWebRTC />
-    ) : (
+    <SafeAreaView style={styles.container}>
       <HtmlHost
         ref={hostRef}
         html={RABAHDJ_HTML}
         onMessage={handleMessage}
         onFileDownload={handleFileDownload}
+        style={showWalkie ? styles.hidden : styles.flexFull}
       />
-    )}
-    <TouchableOpacity
-      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, elevation: 999 }}
-      onPress={() => setShowTest(!showTest)}
-    >
-      <Text style={{ color: '#fff', fontWeight: 'bold' }}>{showTest ? 'رجوع' : 'اختبار WebRTC'}</Text>
-    </TouchableOpacity>
-  </SafeAreaView>
-);
+      {showWalkie && (
+        <WalkieNative
+          isRecording={isPttRecording}
+          lastSpeaker={lastSpeaker}
+          onPressIn={handleWalkiePressIn}
+          onPressOut={handleWalkiePressOut}
+          onBack={() => setShowWalkie(false)}
+        />
+      )}
+      {!showWalkie && (
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#16a34a', padding: 10, borderRadius: 8, elevation: 999 }}
+          onPress={() => setShowWalkie(true)}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎙️ توكي-ووكي</Text>
+        </TouchableOpacity>
+      )}
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
+  flexFull: { flex: 1 },
+  hidden: { position: 'absolute', width: 1, height: 1, opacity: 0 },
 });

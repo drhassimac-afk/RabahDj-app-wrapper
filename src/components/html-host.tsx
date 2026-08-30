@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 export type HtmlHostHandle = {
@@ -10,10 +10,11 @@ export type HtmlHostProps = {
   html: string;
   onMessage: (data: string) => void;
   onFileDownload?: (downloadUrl: string) => void;
+  style?: StyleProp<ViewStyle>;
 };
 
 const HtmlHost = forwardRef<HtmlHostHandle, HtmlHostProps>(
-  ({ html, onMessage, onFileDownload }, ref) => {
+  ({ html, onMessage, onFileDownload, style }, ref) => {
     const webviewRef = useRef<WebView>(null);
 
     useImperativeHandle(ref, () => ({
@@ -29,7 +30,7 @@ const HtmlHost = forwardRef<HtmlHostHandle, HtmlHostProps>(
           html,
           baseUrl: 'https://appassets.androidplatform.net',
         }}
-        style={styles.webview}
+        style={styles.webview, style]}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
