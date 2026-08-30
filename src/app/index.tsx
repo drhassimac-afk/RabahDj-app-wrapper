@@ -1,4 +1,3 @@
-import TestWebRTC from './test-webrtc';
 import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -233,7 +232,7 @@ export default function Index() {
   return (
   <SafeAreaView style={styles.container}>
     {showTest ? (
-      <TestWebRTC />
+      <Text style={{color:'#fff', marginTop:100}}>اختبار مؤقت</Text>
     ) : (
       <HtmlHost
         ref={hostRef}
