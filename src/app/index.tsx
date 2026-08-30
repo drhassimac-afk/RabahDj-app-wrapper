@@ -238,7 +238,7 @@ export default function Index() {
       onFileDownload={handleFileDownload}
     />
     <TouchableOpacity
-      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, zIndex: 999 }}
+      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, zIndex: 999, elevation: 999 }}
       onPress={() => router.push('/test-webrtc')}
     >
       <Text style={{ color: '#fff', fontWeight: 'bold' }}>اختبار WebRTC</Text>
