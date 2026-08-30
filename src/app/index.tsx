@@ -1,3 +1,4 @@
+import TestWebRTC from './test-webrtc';
 import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -7,8 +8,7 @@ import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet } from 'r
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
-import { router } from 'expo-router';
-import { TouchableOpacity, Text } from 'react-native';
+
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -120,6 +120,7 @@ async function showRabahNotification(title: string, body: string) {
 
 export default function Index() {
   const [ready, setReady] = useState(false);
+  const [showTest, setShowTest] = useState(false);
   const hostRef = useRef<HtmlHostHandle>(null);
 
   const injectToPage = useCallback((code: string) => {
@@ -231,17 +232,21 @@ export default function Index() {
 
   return (
   <SafeAreaView style={styles.container}>
-    <HtmlHost
-      ref={hostRef}
-      html={RABAHDJ_HTML}
-      onMessage={handleMessage}
-      onFileDownload={handleFileDownload}
-    />
+    {showTest ? (
+      <TestWebRTC />
+    ) : (
+      <HtmlHost
+        ref={hostRef}
+        html={RABAHDJ_HTML}
+        onMessage={handleMessage}
+        onFileDownload={handleFileDownload}
+      />
+    )}
     <TouchableOpacity
-      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, zIndex: 999, elevation: 999 }}
-      onPress={() => router.push('/test-webrtc')}
+      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, elevation: 999 }}
+      onPress={() => setShowTest(!showTest)}
     >
-      <Text style={{ color: '#fff', fontWeight: 'bold' }}>اختبار WebRTC</Text>
+      <Text style={{ color: '#fff', fontWeight: 'bold' }}>{showTest ? 'رجوع' : 'اختبار WebRTC'}</Text>
     </TouchableOpacity>
   </SafeAreaView>
 );
