@@ -7,6 +7,8 @@ import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet } from 'r
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
+import { router } from 'expo-router';
+import { TouchableOpacity, Text } from 'react-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -228,15 +230,21 @@ export default function Index() {
   if (!ready) return <SafeAreaView style={styles.container} />;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <HtmlHost
-        ref={hostRef}
-        html={RABAHDJ_HTML}
-        onMessage={handleMessage}
-        onFileDownload={handleFileDownload}
-      />
-    </SafeAreaView>
-  );
+  <SafeAreaView style={styles.container}>
+    <HtmlHost
+      ref={hostRef}
+      html={RABAHDJ_HTML}
+      onMessage={handleMessage}
+      onFileDownload={handleFileDownload}
+    />
+    <TouchableOpacity
+      style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#22c55e', padding: 10, borderRadius: 8, zIndex: 999 }}
+      onPress={() => router.push('/test-webrtc')}
+    >
+      <Text style={{ color: '#fff', fontWeight: 'bold' }}>اختبار WebRTC</Text>
+    </TouchableOpacity>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
