@@ -8,6 +8,7 @@ import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
 import { RABAHDJ_HTML } from '../htmlContent';
 import WalkieNative from '@/components/walkie-native';
+import LiveNative from '@/components/live-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -113,6 +114,11 @@ export default function Index() {
   const [showWalkie, setShowWalkie] = useState(false);
   const [isPttRecording, setIsPttRecording] = useState(false);
   const [lastSpeaker, setLastSpeaker] = useState<string | null>(null);
+
+  const [showLive, setShowLive] = useState(false);
+  const [isLive, setIsLive] = useState(false);
+  const [isMicMuted, setIsMicMuted] = useState(false);
+
   const hostRef = useRef<HtmlHostHandle>(null);
 
   const injectToPage = useCallback((code: string) => {
@@ -152,6 +158,30 @@ export default function Index() {
     setIsPttRecording(false);
     void stopPtt();
   }, [stopPtt]);
+
+  const openLive = useCallback(() => {
+    setShowLive(true);
+    injectToPage(`go('live'); void 0;`);
+  }, [injectToPage]);
+
+  const closeLive = useCallback(() => {
+    injectToPage(`stopLive(); go('home'); void 0;`);
+    setShowLive(false);
+    setIsLive(false);
+    setIsMicMuted(false);
+  }, [injectToPage]);
+
+  const handleToggleLive = useCallback(() => {
+    injectToPage(`toggleLive(); void 0;`);
+  }, [injectToPage]);
+
+  const handleToggleMic = useCallback(() => {
+    injectToPage(`toggleMic(); void 0;`);
+  }, [injectToPage]);
+
+  const handleSwitchCamera = useCallback(() => {
+    injectToPage(`switchCamera(); void 0;`);
+  }, [injectToPage]);
 
   useEffect(() => {
     async function requestPerms() {
@@ -207,6 +237,8 @@ export default function Index() {
           body?: string;
           name?: string;
           mine?: boolean;
+          active?: boolean;
+          muted?: boolean;
         };
 
         if (msg.cmd === 'pttStart') void startPtt();
@@ -214,6 +246,14 @@ export default function Index() {
 
         if (msg.cmd === 'walkieLastSpeaker' && msg.name) {
           setLastSpeaker(msg.mine ? 'أنت' : msg.name);
+        }
+
+        if (msg.cmd === 'liveStatus' && typeof msg.active === 'boolean') {
+          setIsLive(msg.active);
+        }
+
+        if (msg.cmd === 'micStatus' && typeof msg.muted === 'boolean') {
+          setIsMicMuted(msg.muted);
         }
 
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
@@ -235,6 +275,8 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
+  const isOverlayActive = showWalkie || showLive;
+
   return (
     <SafeAreaView style={styles.container}>
       <HtmlHost
@@ -253,13 +295,31 @@ export default function Index() {
           onBack={() => setShowWalkie(false)}
         />
       )}
-      {!showWalkie && (
-        <TouchableOpacity
-          style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#16a34a', padding: 10, borderRadius: 8, elevation: 999 }}
-          onPress={() => setShowWalkie(true)}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎙️ توكي-ووكي</Text>
-        </TouchableOpacity>
+      {showLive && (
+        <LiveNative
+          isLive={isLive}
+          isMicMuted={isMicMuted}
+          onToggleLive={handleToggleLive}
+          onToggleMic={handleToggleMic}
+          onSwitchCamera={handleSwitchCamera}
+          onBack={closeLive}
+        />
+      )}
+      {!isOverlayActive && (
+        <>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#16a34a', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={() => setShowWalkie(true)}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎙️ توكي-ووكي</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 95, right: 10, backgroundColor: '#dc2626', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openLive}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📡 بث مباشر</Text>
+          </TouchableOpacity>
+        </>
       )}
     </SafeAreaView>
   );
