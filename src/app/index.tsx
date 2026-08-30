@@ -2,7 +2,7 @@ import * as Sharing from 'expo-sharing';
 import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet } from 'react-native';
+import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
