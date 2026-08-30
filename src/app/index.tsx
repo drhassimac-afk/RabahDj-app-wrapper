@@ -11,6 +11,7 @@ import { RABAHDJ_HTML } from '../htmlContent';
 import WalkieNative from '@/components/walkie-native';
 import LiveNative from '@/components/live-native';
 import FilesNative, { type NativeFileEntry } from '@/components/files-native';
+import CinemaNative from '@/components/cinema-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -113,6 +114,8 @@ async function showRabahNotification(title: string, body: string) {
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+type CinemaCategory = 'movies' | 'tv' | 'series';
+
 export default function Index() {
   const [ready, setReady] = useState(false);
   const [showWalkie, setShowWalkie] = useState(false);
@@ -125,6 +128,10 @@ export default function Index() {
 
   const [showFiles, setShowFiles] = useState(false);
   const [nativeFiles, setNativeFiles] = useState<NativeFileEntry[]>([]);
+
+  const [showCinema, setShowCinema] = useState(false);
+  const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('movies');
+  const [cinemaHistory, setCinemaHistory] = useState<string[]>([]);
 
   const hostRef = useRef<HtmlHostHandle>(null);
 
@@ -221,6 +228,30 @@ export default function Index() {
     void handleFileDownload(file.dataUrl);
   }, []);
 
+  const openCinema = useCallback(() => {
+    setShowCinema(true);
+    injectToPage(`go('cinema'); showCinemaTab('movies'); void 0;`);
+  }, [injectToPage]);
+
+  const closeCinema = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowCinema(false);
+  }, [injectToPage]);
+
+  const handleSelectCinemaCategory = useCallback(
+    (cat: CinemaCategory) => {
+      injectToPage(`showCinemaTab(${JSON.stringify(cat)}); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleCinemaPlay = useCallback(
+    (url: string) => {
+      injectToPage(`playCinema(true, ${JSON.stringify(url)}); void 0;`);
+    },
+    [injectToPage]
+  );
+
   useEffect(() => {
     async function requestPerms() {
       if (Platform.OS === 'android') {
@@ -280,6 +311,8 @@ export default function Index() {
           size?: number;
           dataUrl?: string;
           from?: string;
+          category?: CinemaCategory;
+          history?: string[];
         };
 
         if (msg.cmd === 'pttStart') void startPtt();
@@ -309,6 +342,11 @@ export default function Index() {
           setNativeFiles((prev) => [entry, ...prev]);
         }
 
+        if (msg.cmd === 'cinemaState' && msg.category) {
+          setCinemaCategory(msg.category);
+          setCinemaHistory(msg.history ?? []);
+        }
+
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
           void Notifications.scheduleNotificationAsync({
             content: {
@@ -328,7 +366,8 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
-  const isOverlayActive = showWalkie || showLive || showFiles;
+  const isFullOverlayActive = showWalkie || showFiles;
+  const isAnyOverlayActive = showWalkie || showLive || showFiles || showCinema;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -337,7 +376,7 @@ export default function Index() {
         html={RABAHDJ_HTML}
         onMessage={handleMessage}
         onFileDownload={handleFileDownload}
-        style={showWalkie || showFiles ? styles.hidden : styles.flexFull}
+        style={isFullOverlayActive ? styles.hidden : styles.flexFull}
       />
       {showWalkie && (
         <WalkieNative
@@ -366,7 +405,16 @@ export default function Index() {
           onBack={() => setShowFiles(false)}
         />
       )}
-      {!isOverlayActive && (
+      {showCinema && (
+        <CinemaNative
+          category={cinemaCategory}
+          history={cinemaHistory}
+          onSelectCategory={handleSelectCinemaCategory}
+          onPlay={handleCinemaPlay}
+          onBack={closeCinema}
+        />
+      )}
+      {!isAnyOverlayActive && (
         <>
           <TouchableOpacity
             style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#16a34a', padding: 10, borderRadius: 8, elevation: 999 }}
@@ -385,6 +433,12 @@ export default function Index() {
             onPress={() => setShowFiles(true)}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>📁 ملفات</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 205, right: 10, backgroundColor: '#0d9e3f', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openCinema}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎬 سينما</Text>
           </TouchableOpacity>
         </>
       )}
