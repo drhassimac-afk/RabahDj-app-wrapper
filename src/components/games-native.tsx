@@ -57,22 +57,27 @@ export default function GamesNative({
         </TouchableOpacity>
       </View>
 
-      {activeTab === 'xo' && xo && (
-        <View style={{ alignItems: 'center' }}>
-          <View style={styles.xoBoard}>
-            {xo.board.map((v, i) => {
-              const isWin = xo.winLine?.includes(i);
-              return (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.xoCell, isWin && styles.xoCellWin]}
-                  onPress={() => onXoCell(i)}
-                >
-                  <Text style={styles.xoCellText}>{v}</Text>
-                </TouchableOpacity>
-              );
-            })}
+      <View style={styles.xoBoard}>
+            {[0, 1, 2].map((rowIdx) => (
+              <View key={rowIdx} style={styles.xoRow}>
+                {[0, 1, 2].map((colIdx) => {
+                  const i = rowIdx * 3 + colIdx;
+                  const v = xo.board[i];
+                  const isWin = xo.winLine?.includes(i);
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.xoCell, isWin && styles.xoCellWin]}
+                      onPress={() => onXoCell(i)}
+                    >
+                      <Text style={styles.xoCellText}>{v}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
+              
           <Text style={styles.status}>
             أنت: {xo.mySymbol} — دور: {xo.turn || '-'}{'\n'}
             النتيجة X: {xo.score.X} | O: {xo.score.O}
@@ -86,29 +91,33 @@ export default function GamesNative({
       {activeTab === 'chess' && chess && (
         <View style={{ alignItems: 'center' }}>
           <View style={styles.chessBoard}>
-            {chess.board.map((row, r) =>
-              row.map((piece, c) => {
-                const isSelected = chess.selected && chess.selected[0] === r && chess.selected[1] === c;
-                const isLight = (r + c) % 2 === 0;
-                const isValidMove = chess.validMoves.some((m) => m[0] === r && m[1] === c);
-                return (
-                  <TouchableOpacity
-                    key={`${r}_${c}`}
-                    style={[
-                      styles.sq,
-                      isLight ? styles.sqLight : styles.sqDark,
-                      isSelected && styles.sqSelected,
-                    ]}
-                    onPress={() => onChessCell(r, c)}
-                  >
-                    {piece ? <Text style={styles.piece}>{PIECE_ICON[piece]}</Text> : null}
-                    {isValidMove && !piece && <View style={styles.moveDot} />}
-                    {isValidMove && piece && <View style={styles.captureRing} />}
-                  </TouchableOpacity>
-                );
-              })
-            )}
+            {chess.board.map((row, r) => (
+              <View key={r} style={styles.chessRow}>
+                {row.map((piece, c) => {
+                  const isSelected = chess.selected && chess.selected[0] === r && chess.selected[1] === c;
+                  const isLight = (r + c) % 2 === 0;
+                  const isValidMove = chess.validMoves.some((m) => m[0] === r && m[1] === c);
+                  return (
+                    <TouchableOpacity
+                      key={`${r}_${c}`}
+                      style={[
+                        styles.sq,
+                        isLight ? styles.sqLight : styles.sqDark,
+                        isSelected && styles.sqSelected,
+                      ]}
+                      onPress={() => onChessCell(r, c)}
+                    >
+                      {piece ? <Text style={styles.piece}>{PIECE_ICON[piece]}</Text> : null}
+                      {isValidMove && !piece && <View style={styles.moveDot} />}
+                      {isValidMove && piece && <View style={styles.captureRing} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
+           
+           
           <Text style={[styles.status, { color: chess.turn === chess.myColor ? '#4ade80' : '#94a3b8' }]}>
             {chess.turn === chess.myColor ? '🟢 دورك الآن' : '⏳ دور الخصم'}
           </Text>
@@ -125,8 +134,8 @@ export default function GamesNative({
 const CELL = 38;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0b1220', paddingTop: 50, paddingHorizontal: 16 },
-  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0b1220', paddingHorizontal: 16 },
+  top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 16 },
   back: { backgroundColor: '#ffffff14', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12 },
   backText: { color: '#fff', fontWeight: '700' },
   title: { color: '#fff', fontSize: 18, fontWeight: '800' },
@@ -134,14 +143,18 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ffffff22', backgroundColor: '#ffffff0a', alignItems: 'center' },
   tabActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   tabText: { color: '#fff', fontWeight: '700' },
-  xoBoard: { width: 260, flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  xoBoard: { width: 260, flexD
+  xoBoard: { marginTop: 10 },
+  xoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   xoCell: { width: 80, height: 80, backgroundColor: '#ffffff12', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   xoCellWin: { backgroundColor: '#16a34a55' },
   xoCellText: { color: '#fff', fontSize: 32, fontWeight: '800' },
   status: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 14 },
   resetBtn: { backgroundColor: '#dc2626', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 12, marginTop: 14 },
   resetBtnText: { color: '#fff', fontWeight: '800' },
-  chessBoard: { width: CELL * 8, flexDirection: 'row', flexWrap: 'wrap', borderWidth: 2, borderColor: '#ffffff22', borderRadius: 8, overflow: 'hidden', marginTop: 10 },
+  chessBoard: { width:
+  chessBoard: { borderWidth: 2, borderColor: '#ffffff22', borderRadius: 8, overflow: 'hidden', marginTop: 10 },
+  chessRow: { flexDirection: 'row' },
   sq: { width: CELL, height: CELL, justifyContent: 'center', alignItems: 'center' },
   sqLight: { backgroundColor: '#334155' },
   sqDark: { backgroundColor: '#1e293b' },
