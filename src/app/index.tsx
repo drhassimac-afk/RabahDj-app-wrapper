@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Alert, PermissionsAndroid, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import HtmlHost, { type HtmlHostHandle } from '@/components/html-host';
 import { usePttRecorder } from '@/hooks/use-ptt-recorder';
@@ -13,7 +13,6 @@ import LiveNative from '@/components/live-native';
 import FilesNative, { type NativeFileEntry } from '@/components/files-native';
 import CinemaNative from '@/components/cinema-native';
 import GamesNative, { type XoState, type ChessState } from '@/components/games-native';
-import { Stack } from 'expo-router';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -452,7 +451,6 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
       <HtmlHost
         ref={hostRef}
         html={RABAHDJ_HTML}
@@ -461,6 +459,7 @@ export default function Index() {
         style={isFullOverlayActive ? styles.hidden : styles.flexFull}
       />
       {showWalkie && (
+        <View style={styles.overlayFill}>
         <WalkieNative
           isRecording={isPttRecording}
           lastSpeaker={lastSpeaker}
@@ -468,6 +467,7 @@ export default function Index() {
           onPressOut={handleWalkiePressOut}
           onBack={() => setShowWalkie(false)}
         />
+        </View>
       )}
       {showLive && (
         <LiveNative
@@ -486,6 +486,7 @@ export default function Index() {
           onDownload={handleDownloadFile}
           onBack={() => setShowFiles(false)}
         />
+        </View>
       )}
       {showCinema && (
         <CinemaNative
@@ -495,6 +496,7 @@ export default function Index() {
           onPlay={handleCinemaPlay}
           onBack={closeCinema}
         />
+        </View>
       )}
       {showGames && (
         <GamesNative
@@ -508,6 +510,7 @@ export default function Index() {
           onResetChess={handleResetChess}
           onBack={closeGames}
         />
+        </View>
       )}
       {!isAnyOverlayActive && (
         <>
@@ -551,4 +554,5 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0b1220' },
   flexFull: { flex: 1 },
   hidden: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  overlayFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#0b1220' },
 });
