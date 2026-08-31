@@ -13,6 +13,7 @@ import LiveNative from '@/components/live-native';
 import FilesNative, { type NativeFileEntry } from '@/components/files-native';
 import CinemaNative from '@/components/cinema-native';
 import GamesNative, { type XoState, type ChessState } from '@/components/games-native';
+import { Stack } from 'expo-router';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -451,6 +452,7 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
       <HtmlHost
         ref={hostRef}
         html={RABAHDJ_HTML}
