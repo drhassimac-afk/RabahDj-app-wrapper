@@ -13,6 +13,10 @@ import LiveNative from '@/components/live-native';
 import FilesNative, { type NativeFileEntry } from '@/components/files-native';
 import CinemaNative from '@/components/cinema-native';
 import GamesNative, { type XoState, type ChessState } from '@/components/games-native';
+import ChatNative, { type ChatMessage } from '@/components/chat-native';
+import NearbyNative from '@/components/nearby-native';
+import SettingsNative, { type SettingsState } from '@/components/settings-native';
+import ProfileNative, { type ProfileState } from '@/components/profile-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -138,6 +142,19 @@ export default function Index() {
   const [activeGameTab, setActiveGameTab] = useState<GameTab>('xo');
   const [xoState, setXoState] = useState<XoState | null>(null);
   const [chessState, setChessState] = useState<ChessState | null>(null);
+
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  const [showNearby, setShowNearby] = useState(false);
+  const [nearbyNames, setNearbyNames] = useState<string[]>([]);
+  const [nearbyMyName, setNearbyMyName] = useState('');
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsState, setSettingsState] = useState<SettingsState | null>(null);
+
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileState, setProfileState] = useState<ProfileState | null>(null);
 
   const hostRef = useRef<HtmlHostHandle>(null);
 
@@ -297,6 +314,97 @@ export default function Index() {
     injectToPage(`resetChess(); void 0;`);
   }, [injectToPage]);
 
+  const openChat = useCallback(() => {
+    setShowChat(true);
+    injectToPage(`go('chat'); void 0;`);
+  }, [injectToPage]);
+
+  const closeChat = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowChat(false);
+  }, [injectToPage]);
+
+  const handleSendChat = useCallback(
+    (text: string) => {
+      injectToPage(`$('#txt').value=${JSON.stringify(text)}; sendChat(); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const openNearby = useCallback(() => {
+    setShowNearby(true);
+    injectToPage(`go('nearby'); renderNearby(); void 0;`);
+  }, [injectToPage]);
+
+  const closeNearby = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowNearby(false);
+  }, [injectToPage]);
+
+  const handleWave = useCallback(
+    (name: string) => {
+      injectToPage(`waveTo(${JSON.stringify(name)}); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const openSettings = useCallback(() => {
+    setShowSettings(true);
+    injectToPage(`go('settings'); loadSettings(); void 0;`);
+  }, [injectToPage]);
+
+  const closeSettings = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowSettings(false);
+  }, [injectToPage]);
+
+  const handleSaveSettingsName = useCallback(
+    (name: string) => {
+      injectToPage(`$('#settingsName').value=${JSON.stringify(name)}; saveName(); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleToggleSettingOption = useCallback(
+    (key: 'notif' | 'vibrate' | 'sound', value: boolean) => {
+      const idMap: Record<string, string> = { notif: 'optNotif', vibrate: 'optVibrate', sound: 'optSound' };
+      injectToPage(`document.getElementById('${idMap[key]}').checked=${value}; saveOptions(); void 0;`);
+    },
+    [injectToPage]
+  );
+
+  const handleSaveConnection = useCallback(
+    (enabled: boolean, ip: string, port: string) => {
+      injectToPage(
+        `document.getElementById('optLocalServer').checked=${enabled}; $('#localServerIp').value=${JSON.stringify(ip)}; $('#localServerPort').value=${JSON.stringify(port)}; saveConnectionMode(); void 0;`
+      );
+    },
+    [injectToPage]
+  );
+
+  const handleClearSettingsData = useCallback(() => {
+    injectToPage(`clearSavedData(); void 0;`);
+  }, [injectToPage]);
+
+  const openProfile = useCallback(() => {
+    setShowProfile(true);
+    injectToPage(`go('profile'); loadProfile(); void 0;`);
+  }, [injectToPage]);
+
+  const closeProfile = useCallback(() => {
+    injectToPage(`go('home'); void 0;`);
+    setShowProfile(false);
+  }, [injectToPage]);
+
+  const handleSaveProfile = useCallback(
+    (name: string, status: string) => {
+      injectToPage(
+        `$('#profileName').value=${JSON.stringify(name)}; $('#profileStatus').value=${JSON.stringify(status)}; saveProfile(); void 0;`
+      );
+    },
+    [injectToPage]
+  );
+
   useEffect(() => {
     async function requestPerms() {
       if (Platform.OS === 'android') {
@@ -368,6 +476,18 @@ export default function Index() {
           myColor?: string;
           validMoves?: [number, number][];
           which?: GameTab;
+          text?: string;
+          names?: string[];
+          myName?: string;
+          notif?: boolean;
+          vibrate?: boolean;
+          sound?: boolean;
+          localEnabled?: boolean;
+          localIp?: string;
+          localPort?: string;
+          lastRoom?: string;
+          status?: string;
+          avatar?: string;
         };
 
         if (msg.cmd === 'pttStart') void startPtt();
@@ -427,6 +547,42 @@ export default function Index() {
           setActiveGameTab(msg.which);
         }
 
+        if (msg.cmd === 'chatMessage' && msg.name && typeof msg.text === 'string') {
+          const entry: ChatMessage = {
+            id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            name: msg.name,
+            text: msg.text,
+            mine: !!msg.mine,
+          };
+          setChatMessages((prev) => [...prev, entry]);
+        }
+
+        if (msg.cmd === 'nearbyState') {
+          setNearbyNames(msg.names ?? []);
+          setNearbyMyName(msg.myName ?? '');
+        }
+
+        if (msg.cmd === 'settingsState') {
+          setSettingsState({
+            name: msg.name ?? '',
+            notif: msg.notif ?? true,
+            vibrate: msg.vibrate ?? true,
+            sound: msg.sound ?? true,
+            localEnabled: msg.localEnabled ?? false,
+            localIp: msg.localIp ?? '',
+            localPort: msg.localPort ?? '9000',
+            lastRoom: msg.lastRoom ?? '',
+          });
+        }
+
+        if (msg.cmd === 'profileState') {
+          setProfileState({
+            name: msg.name ?? '',
+            status: msg.status ?? '',
+            avatar: msg.avatar ?? '',
+          });
+        }
+
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
           void Notifications.scheduleNotificationAsync({
             content: {
@@ -446,8 +602,10 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
-  const isFullOverlayActive = showWalkie || showFiles || showGames;
-  const isAnyOverlayActive = showWalkie || showLive || showFiles || showCinema || showGames;
+  const isFullOverlayActive =
+    showWalkie || showFiles || showGames || showChat || showNearby || showSettings || showProfile;
+  const isAnyOverlayActive =
+    showWalkie || showLive || showFiles || showCinema || showGames || showChat || showNearby || showSettings || showProfile;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -515,6 +673,33 @@ export default function Index() {
           />
         </View>
       )}
+      {showChat && (
+        <View style={styles.overlayFill}>
+          <ChatNative messages={chatMessages} onSend={handleSendChat} onBack={closeChat} />
+        </View>
+      )}
+      {showNearby && (
+        <View style={styles.overlayFill}>
+          <NearbyNative names={nearbyNames} myName={nearbyMyName} onWave={handleWave} onBack={closeNearby} />
+        </View>
+      )}
+      {showSettings && (
+        <View style={styles.overlayFill}>
+          <SettingsNative
+            settings={settingsState}
+            onSaveName={handleSaveSettingsName}
+            onToggleOption={handleToggleSettingOption}
+            onSaveConnection={handleSaveConnection}
+            onClearData={handleClearSettingsData}
+            onBack={closeSettings}
+          />
+        </View>
+      )}
+      {showProfile && (
+        <View style={styles.overlayFill}>
+          <ProfileNative profile={profileState} onSave={handleSaveProfile} onBack={closeProfile} />
+        </View>
+      )}
       {!isAnyOverlayActive && (
         <>
           <TouchableOpacity
@@ -546,6 +731,30 @@ export default function Index() {
             onPress={openGames}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎮 ألعاب</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 315, right: 10, backgroundColor: '#1668e3', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openChat}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>💬 محادثات</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 370, right: 10, backgroundColor: '#ea580c', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openNearby}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📍 قريبون</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 425, right: 10, backgroundColor: '#475569', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openSettings}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>⚙️ إعدادات</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 480, right: 10, backgroundColor: '#0891b2', padding: 10, borderRadius: 8, elevation: 999 }}
+            onPress={openProfile}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>👤 ملفي</Text>
           </TouchableOpacity>
         </>
       )}
