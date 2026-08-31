@@ -57,7 +57,9 @@ export default function GamesNative({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.xoBoard}>
+      {activeTab === 'xo' && xo && (
+        <View style={{ alignItems: 'center' }}>
+          <View style={styles.xoBoard}>
             {[0, 1, 2].map((rowIdx) => (
               <View key={rowIdx} style={styles.xoRow}>
                 {[0, 1, 2].map((colIdx) => {
@@ -77,7 +79,6 @@ export default function GamesNative({
               </View>
             ))}
           </View>
-              
           <Text style={styles.status}>
             أنت: {xo.mySymbol} — دور: {xo.turn || '-'}{'\n'}
             النتيجة X: {xo.score.X} | O: {xo.score.O}
@@ -116,8 +117,6 @@ export default function GamesNative({
               </View>
             ))}
           </View>
-           
-           
           <Text style={[styles.status, { color: chess.turn === chess.myColor ? '#4ade80' : '#94a3b8' }]}>
             {chess.turn === chess.myColor ? '🟢 دورك الآن' : '⏳ دور الخصم'}
           </Text>
@@ -143,7 +142,6 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ffffff22', backgroundColor: '#ffffff0a', alignItems: 'center' },
   tabActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   tabText: { color: '#fff', fontWeight: '700' },
-  xoBoard: { width: 260, flexD
   xoBoard: { marginTop: 10 },
   xoRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   xoCell: { width: 80, height: 80, backgroundColor: '#ffffff12', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
@@ -152,7 +150,6 @@ const styles = StyleSheet.create({
   status: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 14 },
   resetBtn: { backgroundColor: '#dc2626', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 12, marginTop: 14 },
   resetBtnText: { color: '#fff', fontWeight: '800' },
-  chessBoard: { width:
   chessBoard: { borderWidth: 2, borderColor: '#ffffff22', borderRadius: 8, overflow: 'hidden', marginTop: 10 },
   chessRow: { flexDirection: 'row' },
   sq: { width: CELL, height: CELL, justifyContent: 'center', alignItems: 'center' },
