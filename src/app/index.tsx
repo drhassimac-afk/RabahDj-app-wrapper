@@ -460,13 +460,13 @@ export default function Index() {
       />
       {showWalkie && (
         <View style={styles.overlayFill}>
-        <WalkieNative
-          isRecording={isPttRecording}
-          lastSpeaker={lastSpeaker}
-          onPressIn={handleWalkiePressIn}
-          onPressOut={handleWalkiePressOut}
-          onBack={() => setShowWalkie(false)}
-        />
+          <WalkieNative
+            isRecording={isPttRecording}
+            lastSpeaker={lastSpeaker}
+            onPressIn={handleWalkiePressIn}
+            onPressOut={handleWalkiePressOut}
+            onBack={() => setShowWalkie(false)}
+          />
         </View>
       )}
       {showLive && (
@@ -480,36 +480,39 @@ export default function Index() {
         />
       )}
       {showFiles && (
-        <FilesNative
-          files={nativeFiles}
-          onPickFile={handlePickFile}
-          onDownload={handleDownloadFile}
-          onBack={() => setShowFiles(false)}
-        />
+        <View style={styles.overlayFill}>
+          <FilesNative
+            files={nativeFiles}
+            onPickFile={handlePickFile}
+            onDownload={handleDownloadFile}
+            onBack={() => setShowFiles(false)}
+          />
         </View>
       )}
       {showCinema && (
-        <CinemaNative
-          category={cinemaCategory}
-          history={cinemaHistory}
-          onSelectCategory={handleSelectCinemaCategory}
-          onPlay={handleCinemaPlay}
-          onBack={closeCinema}
-        />
+        <View style={styles.overlayFill}>
+          <CinemaNative
+            category={cinemaCategory}
+            history={cinemaHistory}
+            onSelectCategory={handleSelectCinemaCategory}
+            onPlay={handleCinemaPlay}
+            onBack={closeCinema}
+          />
         </View>
       )}
       {showGames && (
-        <GamesNative
-          activeTab={activeGameTab}
-          xo={xoState}
-          chess={chessState}
-          onSelectTab={handleSelectGameTab}
-          onXoCell={handleXoCell}
-          onChessCell={handleChessCell}
-          onResetXo={handleResetXo}
-          onResetChess={handleResetChess}
-          onBack={closeGames}
-        />
+        <View style={styles.overlayFill}>
+          <GamesNative
+            activeTab={activeGameTab}
+            xo={xoState}
+            chess={chessState}
+            onSelectTab={handleSelectGameTab}
+            onXoCell={handleXoCell}
+            onChessCell={handleChessCell}
+            onResetXo={handleResetXo}
+            onResetChess={handleResetChess}
+            onBack={closeGames}
+          />
         </View>
       )}
       {!isAnyOverlayActive && (
