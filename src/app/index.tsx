@@ -17,6 +17,7 @@ import ChatNative, { type ChatMessage } from '@/components/chat-native';
 import NearbyNative from '@/components/nearby-native';
 import SettingsNative, { type SettingsState } from '@/components/settings-native';
 import ProfileNative, { type ProfileState } from '@/components/profile-native';
+import HomeNative from '@/components/home-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -155,6 +156,11 @@ export default function Index() {
 
   const [showProfile, setShowProfile] = useState(false);
   const [profileState, setProfileState] = useState<ProfileState | null>(null);
+
+  const [homeName, setHomeName] = useState('');
+  const [homeRoom, setHomeRoom] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('غير متصل');
+  const homeNamePrefilledRef = useRef(false);
 
   const hostRef = useRef<HtmlHostHandle>(null);
 
@@ -405,6 +411,12 @@ export default function Index() {
     [injectToPage]
   );
 
+  const handleConnectRoom = useCallback(() => {
+    injectToPage(
+      `$('#name').value=${JSON.stringify(homeName)}; $('#room').value=${JSON.stringify(homeRoom)}; join(); void 0;`
+    );
+  }, [injectToPage, homeName, homeRoom]);
+
   useEffect(() => {
     async function requestPerms() {
       if (Platform.OS === 'android') {
@@ -573,6 +585,10 @@ export default function Index() {
             localPort: msg.localPort ?? '9000',
             lastRoom: msg.lastRoom ?? '',
           });
+          if (!homeNamePrefilledRef.current && msg.name) {
+            homeNamePrefilledRef.current = true;
+            setHomeName(msg.name);
+          }
         }
 
         if (msg.cmd === 'profileState') {
@@ -581,6 +597,10 @@ export default function Index() {
             status: msg.status ?? '',
             avatar: msg.avatar ?? '',
           });
+        }
+
+        if (msg.cmd === 'connectionStatus' && typeof msg.text === 'string') {
+          setConnectionStatus(msg.text);
         }
 
         if (msg.cmd === 'nativeNotification' && msg.title && msg.body) {
@@ -602,10 +622,19 @@ export default function Index() {
 
   if (!ready) return <SafeAreaView style={styles.container} />;
 
-  const isFullOverlayActive =
-    showWalkie || showFiles || showGames || showChat || showNearby || showSettings || showProfile;
+  const webviewNeedsVisible = showLive || showCinema;
   const isAnyOverlayActive =
     showWalkie || showLive || showFiles || showCinema || showGames || showChat || showNearby || showSettings || showProfile;
+
+  const homeCards = [
+    { key: 'live', label: 'بث مباشر', emoji: '📡', gradient: ['#7c1fd9', '#4a0f8c'] as [string, string], onPress: openLive },
+    { key: 'cinema', label: 'سينما وتلفاز', emoji: '🎬', gradient: ['#00c853', '#009624'] as [string, string], onPress: openCinema },
+    { key: 'walkie', label: 'تخاطب لاسلكي', emoji: '🎙️', gradient: ['#00c853', '#009624'] as [string, string], onPress: () => setShowWalkie(true) },
+    { key: 'games', label: 'الألعاب', emoji: '🎮', gradient: ['#ff9800', '#e65100'] as [string, string], onPress: openGames },
+    { key: 'chat', label: 'محادثات فورية', emoji: '💬', gradient: ['#448aff', '#1565c0'] as [string, string], onPress: openChat },
+    { key: 'files', label: 'مشاركة ملفات', emoji: '📁', gradient: ['#7c1fd9', '#4a0f8c'] as [string, string], onPress: () => setShowFiles(true) },
+    { key: 'nearby', label: 'قريبون مني', emoji: '📍', gradient: ['#ff9800', '#e65100'] as [string, string], onPress: openNearby },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -614,8 +643,23 @@ export default function Index() {
         html={RABAHDJ_HTML}
         onMessage={handleMessage}
         onFileDownload={handleFileDownload}
-        style={isFullOverlayActive ? styles.hidden : styles.flexFull}
+        style={webviewNeedsVisible ? styles.flexFull : styles.hidden}
       />
+      {!isAnyOverlayActive && (
+        <View style={styles.overlayFill}>
+          <HomeNative
+            cards={homeCards}
+            name={homeName}
+            room={homeRoom}
+            connectionStatus={connectionStatus}
+            onNameChange={setHomeName}
+            onRoomChange={setHomeRoom}
+            onConnect={handleConnectRoom}
+            onOpenSettings={openSettings}
+            onOpenProfile={openProfile}
+          />
+        </View>
+      )}
       {showWalkie && (
         <View style={styles.overlayFill}>
           <WalkieNative
@@ -699,64 +743,6 @@ export default function Index() {
         <View style={styles.overlayFill}>
           <ProfileNative profile={profileState} onSave={handleSaveProfile} onBack={closeProfile} />
         </View>
-      )}
-      {!isAnyOverlayActive && (
-        <>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 40, right: 10, backgroundColor: '#16a34a', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={() => setShowWalkie(true)}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎙️ توكي-ووكي</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 95, right: 10, backgroundColor: '#dc2626', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openLive}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📡 بث مباشر</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 150, right: 10, backgroundColor: '#7c1fd9', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={() => setShowFiles(true)}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📁 ملفات</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 205, right: 10, backgroundColor: '#0d9e3f', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openCinema}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎬 سينما</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 260, right: 10, backgroundColor: '#f59e0b', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openGames}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>🎮 ألعاب</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 315, right: 10, backgroundColor: '#1668e3', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openChat}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>💬 محادثات</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 370, right: 10, backgroundColor: '#ea580c', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openNearby}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>📍 قريبون</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 425, right: 10, backgroundColor: '#475569', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openSettings}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>⚙️ إعدادات</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ position: 'absolute', top: 480, right: 10, backgroundColor: '#0891b2', padding: 10, borderRadius: 8, elevation: 999 }}
-            onPress={openProfile}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>👤 ملفي</Text>
-          </TouchableOpacity>
-        </>
       )}
     </SafeAreaView>
   );
