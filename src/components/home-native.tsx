@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Animated } from 'react-native';
 
 type CardDef = { key: string; label: string; emoji: string; gradient: [string, string]; onPress: () => void };
 
@@ -14,7 +14,26 @@ type Props = {
   onOpenSettings: () => void;
   onOpenProfile: () => void;
 };
+function FloatingCard({ children, delay }: { children: React.ReactNode; delay: number }) {
+  const translateY = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, { toValue: -8, duration: 1800, useNativeDriver: true, delay }),
+        Animated.timing(translateY, { toValue: 0, duration: 1800, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [translateY, delay]);
+
+  return (
+    <Animated.View style={[{ width: '47%' }, { transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
 export default function HomeNative({
   cards, name, room, connectionStatus, onNameChange, onRoomChange, onConnect, onOpenSettings, onOpenProfile,
 }: Props) {
@@ -36,13 +55,15 @@ export default function HomeNative({
       <Text style={styles.desc}>اتصل، شارك، وابث صوتاً وفيديو مع أصدقائك{'\n'}عبر شبكتك المحلية</Text>
 
       <View style={styles.grid}>
-        {cards.map((card) => (
-          <TouchableOpacity key={card.key} style={styles.card} onPress={card.onPress}>
-            <View style={[styles.cardIcon, { backgroundColor: card.gradient[0] }]}>
-              <Text style={styles.cardEmoji}>{card.emoji}</Text>
-            </View>
-            <Text style={styles.cardLabel}>{card.label}</Text>
-          </TouchableOpacity>
+        {cards.map((card, index) => (
+          <FloatingCard key={card.key} delay={index * 400}>
+            <TouchableOpacity style={styles.card} onPress={card.onPress}>
+              <View style={[styles.cardIcon, { backgroundColor: card.gradient[0] }]}>
+                <Text style={styles.cardEmoji}>{card.emoji}</Text>
+              </View>
+              <Text style={styles.cardLabel}>{card.label}</Text>
+            </TouchableOpacity>
+          </FloatingCard>
         ))}
       </View>
 
@@ -70,7 +91,7 @@ const styles = StyleSheet.create({
   desc: { color: '#94a3b8', textAlign: 'center', marginTop: 8, marginBottom: 20, lineHeight: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14 },
   card: {
-    width: '47%', aspectRatio: 1.05, borderRadius: 24, backgroundColor: '#ffffff08', borderWidth: 1, borderColor: '#ffffff14',
+    aspectRatio: 1.05, borderRadius: 24, backgroundColor: '#ffffff08', borderWidth: 1, borderColor: '#ffffff14',
     justifyContent: 'center', alignItems: 'center', gap: 12, marginBottom: 14,
   },
   cardIcon: { width: 60, height: 60, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
